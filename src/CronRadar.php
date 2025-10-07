@@ -4,12 +4,12 @@ namespace CronRadar;
 
 /**
  * Dead-simple cron job monitoring with auto-registration support.
- * Two main functions: ping() for execution confirmation, syncMonitor() for registration.
+ * Primary function: monitor() for execution confirmation. Advanced: sync() for pre-registration.
  */
 class CronRadar
 {
     /**
-     * Ping CronRadar to indicate your job has run successfully.
+     * Monitor a job execution by recording it in CronRadar.
      * Optionally provide schedule for self-healing (auto-registration on 404).
      *
      * @param string $monitorKey The monitor key identifying your job
@@ -17,7 +17,7 @@ class CronRadar
      * @param int|null $gracePeriod Optional grace period in seconds for auto-registration
      * @return void
      */
-    public static function ping(string $monitorKey, ?string $schedule = null, ?int $gracePeriod = null): void
+    public static function monitor(string $monitorKey, ?string $schedule = null, ?int $gracePeriod = null): void
     {
         try {
             $apiKey = getenv('CRONRADAR_API_KEY') ?: '';
@@ -34,7 +34,7 @@ class CronRadar
                 error_log("[CronRadar] Monitor '{$monitorKey}' not found. Auto-registering with schedule '{$schedule}'...");
 
                 $source = self::detectSource();
-                self::syncMonitor($monitorKey, $schedule, $source, null, $gracePeriod ?? 60);
+                self::sync($monitorKey, $schedule, $source, null, $gracePeriod ?? 60);
 
                 // Retry ping
                 self::sendPingInternal($monitorKey, $apiKey);
@@ -47,8 +47,8 @@ class CronRadar
     }
 
     /**
-     * Register a monitor with CronRadar, setting up expectations for when it should run.
-     * Used by extensions to sync discovered jobs.
+     * Pre-register a monitor with CronRadar, setting up expectations for when it should run.
+     * Used internally by extensions to sync discovered jobs. Advanced usage only.
      *
      * @param string $monitorKey The unique identifier for this monitor
      * @param string $schedule Cron expression defining when the job runs
@@ -57,7 +57,7 @@ class CronRadar
      * @param int $gracePeriod Grace period in seconds before alerting (default: 60)
      * @return void
      */
-    public static function syncMonitor(
+    public static function sync(
         string $monitorKey,
         string $schedule,
         ?string $source = null,

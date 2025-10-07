@@ -16,10 +16,10 @@ composer require cronradar/php
 use CronRadar\CronRadar;
 
 // After your cron job completes successfully
-CronRadar::ping('daily-backup');
+CronRadar::monitor('daily-backup');
 
 // With self-healing (auto-register if monitor doesn't exist)
-CronRadar::ping('daily-backup', '0 2 * * *', 300);
+CronRadar::monitor('daily-backup', '0 2 * * *', 300);
 ```
 
 ## Configuration
