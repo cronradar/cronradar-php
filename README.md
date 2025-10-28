@@ -19,15 +19,13 @@ use CronRadar\CronRadar;
 CronRadar::monitor('daily-backup');
 
 // With self-healing (auto-register if monitor doesn't exist)
-CronRadar::monitor('daily-backup', '0 2 * * *', 300);
+CronRadar::monitor('daily-backup', '0 2 * * *');
 ```
 
 ## Configuration
 
 Set environment variable:
 - `CRONRADAR_API_KEY`: Your API key from cronradar.com
-- `CRONRADAR_BASE_URL`: Base URL override (optional, default: `https://cronradar.com`)
-- `CRONRADAR_METHOD`: HTTP method for ping (optional, default: `GET`)
 
 ## Documentation
 
