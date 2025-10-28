@@ -14,10 +14,9 @@ class CronRadar
      *
      * @param string $monitorKey The monitor key identifying your job
      * @param string|null $schedule Optional cron schedule for auto-registration if monitor doesn't exist
-     * @param int|null $gracePeriod Optional grace period in seconds for auto-registration
      * @return void
      */
-    public static function monitor(string $monitorKey, ?string $schedule = null, ?int $gracePeriod = null): void
+    public static function monitor(string $monitorKey, ?string $schedule = null): void
     {
         try {
             $apiKey = getenv('CRONRADAR_API_KEY') ?: '';
@@ -34,7 +33,7 @@ class CronRadar
                 error_log("[CronRadar] Monitor '{$monitorKey}' not found. Auto-registering with schedule '{$schedule}'...");
 
                 $source = self::detectSource();
-                self::sync($monitorKey, $schedule, $source, null, $gracePeriod ?? 60);
+                self::sync($monitorKey, $schedule, $source);
 
                 // Retry ping
                 self::sendPingInternal($monitorKey, $apiKey);
@@ -54,15 +53,13 @@ class CronRadar
      * @param string $schedule Cron expression defining when the job runs
      * @param string|null $source Source framework (e.g., "hangfire", "laravel"). Auto-detected if null.
      * @param string|null $name Human-readable name. Generated from key if null.
-     * @param int $gracePeriod Grace period in seconds before alerting (default: 60)
      * @return void
      */
     public static function sync(
         string $monitorKey,
         string $schedule,
         ?string $source = null,
-        ?string $name = null,
-        int $gracePeriod = 60
+        ?string $name = null
     ): void {
         try {
             $apiKey = getenv('CRONRADAR_API_KEY') ?: '';
@@ -81,13 +78,12 @@ class CronRadar
                         'key' => $monitorKey,
                         'name' => $name,
                         'schedule' => $schedule,
-                        'gracePeriod' => $gracePeriod
+                        'gracePeriod' => 60
                     ]
                 ]
             ];
 
-            $baseUrl = getenv('CRONRADAR_BASE_URL') ?: 'https://cronradar.com';
-            $url = rtrim($baseUrl, '/') . '/api/sync';
+            $url = 'https://api.cronradar.com/api/sync';
 
             $ch = curl_init($url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -98,9 +94,6 @@ class CronRadar
                 'Authorization: Basic ' . base64_encode($apiKey . ':')
             ]);
             curl_setopt($ch, CURLOPT_TIMEOUT, 5);
-
-            // Configure SSL certificate verification
-            self::configureSslVerification($ch);
 
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -127,20 +120,15 @@ class CronRadar
     private static function sendPingInternal(string $monitorKey, string $apiKey): ?array
     {
         try {
-            $method = strtoupper(getenv('CRONRADAR_METHOD') ?: 'GET');
-            $baseUrl = getenv('CRONRADAR_BASE_URL') ?: 'https://cronradar.com';
-            $url = rtrim($baseUrl, '/') . '/ping/' . urlencode($monitorKey);
+            $url = 'https://api.cronradar.com/ping/' . urlencode($monitorKey);
 
             $ch = curl_init($url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'GET');
             curl_setopt($ch, CURLOPT_HTTPHEADER, [
                 'Authorization: Basic ' . base64_encode($apiKey . ':')
             ]);
             curl_setopt($ch, CURLOPT_TIMEOUT, 5);
-
-            // Configure SSL certificate verification
-            self::configureSslVerification($ch);
 
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -223,31 +211,4 @@ class CronRadar
         return ucfirst($monitorKey);
     }
 
-    /**
-     * Configure SSL certificate verification for cURL
-     *
-     * @param resource $ch cURL handle
-     * @return void
-     */
-    private static function configureSslVerification($ch): void
-    {
-        // Allow SSL verification to be disabled via env (dev/testing only)
-        if (getenv('CRONRADAR_VERIFY_SSL') === 'false') {
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-            return;
-        }
-
-        // Check if system has CA bundle configured
-        $systemCaInfo = ini_get('curl.cainfo') ?: ini_get('openssl.cafile');
-
-        if (empty($systemCaInfo)) {
-            // System doesn't have CA bundle - use bundled cacert.pem
-            $bundledCa = dirname(__DIR__) . '/cacert.pem';
-            if (file_exists($bundledCa)) {
-                curl_setopt($ch, CURLOPT_CAINFO, $bundledCa);
-            }
-        }
-        // else: System CA bundle is configured, cURL will use it automatically
-    }
 }
