@@ -1,6 +1,6 @@
 {
     "name": "cronradar/php",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "description": "Dead-simple cron job monitoring with auto-registration. One primary function: monitor(). Advanced: sync(). Self-healing monitors.",
     "keywords": ["cron", "monitoring", "scheduler", "job", "task", "ping", "sync", "auto-register"],
     "license": "proprietary",
