@@ -33,7 +33,7 @@ class CronRadar
                 error_log("[CronRadar] Monitor '{$monitorKey}' not found. Auto-registering with schedule '{$schedule}'...");
 
                 $source = self::detectSource();
-                self::sync($monitorKey, $schedule, $source);
+                self::syncMonitor($monitorKey, $schedule, $source);
 
                 // Retry ping
                 self::sendPingInternal($monitorKey, $apiKey);
@@ -46,6 +46,93 @@ class CronRadar
     }
 
     /**
+     * Signal that a job has started executing.
+     * Used for lifecycle tracking to detect hung jobs and measure execution duration.
+     *
+     * @param string $monitorKey The monitor key identifying your job
+     * @param string|null $schedule Optional cron schedule for auto-registration
+     * @return void
+     */
+    public static function startJob(string $monitorKey, ?string $schedule = null): void
+    {
+        try {
+            $apiKey = getenv('CRONRADAR_API_KEY') ?: '';
+            if (empty($apiKey)) return;
+
+            self::sendLifecyclePing($monitorKey, 'start', $apiKey, $schedule);
+        } catch (\Throwable $e) {
+            error_log("[CronRadar] Error during startJob: {$e->getMessage()}");
+        }
+    }
+
+    /**
+     * Signal that a job has completed successfully.
+     * Used for lifecycle tracking to record completion time and calculate duration.
+     *
+     * @param string $monitorKey The monitor key identifying your job
+     * @return void
+     */
+    public static function completeJob(string $monitorKey): void
+    {
+        try {
+            $apiKey = getenv('CRONRADAR_API_KEY') ?: '';
+            if (empty($apiKey)) return;
+
+            self::sendLifecyclePing($monitorKey, 'complete', $apiKey);
+        } catch (\Throwable $e) {
+            error_log("[CronRadar] Error during completeJob: {$e->getMessage()}");
+        }
+    }
+
+    /**
+     * Signal that a job has failed.
+     * Triggers immediate alerts without waiting for grace period.
+     *
+     * @param string $monitorKey The monitor key identifying your job
+     * @param string|null $message Optional failure message for debugging
+     * @return void
+     */
+    public static function failJob(string $monitorKey, ?string $message = null): void
+    {
+        try {
+            $apiKey = getenv('CRONRADAR_API_KEY') ?: '';
+            if (empty($apiKey)) return;
+
+            self::sendLifecyclePing($monitorKey, 'fail', $apiKey, null, $message);
+        } catch (\Throwable $e) {
+            error_log("[CronRadar] Error during failJob: {$e->getMessage()}");
+        }
+    }
+
+    /**
+     * Wrap a callable with automatic lifecycle monitoring.
+     * Handles start/complete/fail signals automatically.
+     *
+     * Example:
+     *   $backupJob = CronRadar::wrap('backup-job', fn() => runBackup());
+     *   $backupJob();
+     *
+     * @param string $monitorKey The monitor key identifying your job
+     * @param callable $func The function to wrap
+     * @param string|null $schedule Optional cron schedule for auto-registration
+     * @return callable Wrapped function
+     */
+    public static function wrap(string $monitorKey, callable $func, ?string $schedule = null): callable
+    {
+        return function(...$args) use ($monitorKey, $func, $schedule) {
+            self::startJob($monitorKey, $schedule);
+            try {
+                $result = $func(...$args);
+                self::completeJob($monitorKey);
+                return $result;
+            } catch (\Throwable $e) {
+                self::failJob($monitorKey, $e->getMessage());
+                throw $e; // Re-throw to preserve original behavior
+            }
+        };
+    }
+
+    /**
      * Pre-register a monitor with CronRadar, setting up expectations for when it should run.
      * Used internally by extensions to sync discovered jobs. Advanced usage only.
      *
@@ -55,7 +142,7 @@ class CronRadar
      * @param string|null $name Human-readable name. Generated from key if null.
      * @return void
      */
-    public static function sync(
+    public static function syncMonitor(
         string $monitorKey,
         string $schedule,
         ?string $source = null,
@@ -83,7 +170,7 @@ class CronRadar
                 ]
             ];
 
-            $url = 'https://api.cronradar.com/api/sync';
+            $url = 'https://cron.life/api/sync';
 
             $ch = curl_init($url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -120,7 +207,7 @@ class CronRadar
     private static function sendPingInternal(string $monitorKey, string $apiKey): ?array
     {
         try {
-            $url = 'https://api.cronradar.com/ping/' . urlencode($monitorKey);
+            $url = 'https://cron.life/ping/' . urlencode($monitorKey);
 
             $ch = curl_init($url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -137,6 +224,55 @@ class CronRadar
             return ['status' => $httpCode, 'body' => $response];
         } catch (\Throwable $e) {
             return null;
+        }
+    }
+
+    /**
+     * Send lifecycle ping (start/complete/fail) internally
+     *
+     * @param string $monitorKey
+     * @param string $endpoint
+     * @param string $apiKey
+     * @param string|null $schedule
+     * @param string|null $message
+     * @return void
+     */
+    private static function sendLifecyclePing(
+        string $monitorKey,
+        string $endpoint,
+        string $apiKey,
+        ?string $schedule = null,
+        ?string $message = null
+    ): void {
+        try {
+            // Build URL
+            $url = 'https://cron.life/ping/' . urlencode($monitorKey) . '/' . $endpoint;
+
+            // Add query parameters
+            $params = [];
+            if (!empty($schedule)) {
+                $params[] = 'schedule=' . urlencode($schedule);
+            }
+            if (!empty($message)) {
+                $params[] = 'message=' . urlencode($message);
+            }
+
+            if (!empty($params)) {
+                $url .= '?' . implode('&', $params);
+            }
+
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Authorization: Basic ' . base64_encode($apiKey . ':')
+            ]);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+
+            curl_exec($ch);
+            curl_close($ch);
+        } catch (\Throwable $e) {
+            // Silently fail to protect job execution
         }
     }
 
