@@ -45,12 +45,15 @@ try {
 ## Configuration
 
 Set environment variable:
-- `CRONRADAR_API_KEY`: Your API key from cronradar.com
+- `CRONRADAR_API_KEY`: Your CronRadar API key
 
-## Documentation
+## Links
 
-See [cronradar.com/docs](https://cronradar.com/docs) for full documentation.
+- [Documentation](https://docs.cronradar.com)
+- [Packagist](https://packagist.org/packages/cronradar/php)
+
+**Extensions:** [Laravel](https://packagist.org/packages/cronradar/laravel)
 
 ## License
 
-Proprietary - © 2025 CronRadar. All rights reserved.
+© 2025 [CronRadar](https://cronradar.com) - See [LICENSE](./LICENSE)
