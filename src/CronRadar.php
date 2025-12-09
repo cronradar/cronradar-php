@@ -99,6 +99,9 @@ class CronRadar
             ]);
             curl_setopt($ch, CURLOPT_TIMEOUT, 5);
 
+            // Configure SSL certificate verification
+            self::configureSslVerification($ch);
+
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
@@ -135,6 +138,9 @@ class CronRadar
                 'Authorization: Basic ' . base64_encode($apiKey . ':')
             ]);
             curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+
+            // Configure SSL certificate verification
+            self::configureSslVerification($ch);
 
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -215,5 +221,33 @@ class CronRadar
 
         // Default: just capitalize first letter
         return ucfirst($monitorKey);
+    }
+
+    /**
+     * Configure SSL certificate verification for cURL
+     *
+     * @param resource $ch cURL handle
+     * @return void
+     */
+    private static function configureSslVerification($ch): void
+    {
+        // Allow SSL verification to be disabled via env (dev/testing only)
+        if (getenv('CRONRADAR_VERIFY_SSL') === 'false') {
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+            return;
+        }
+
+        // Check if system has CA bundle configured
+        $systemCaInfo = ini_get('curl.cainfo') ?: ini_get('openssl.cafile');
+
+        if (empty($systemCaInfo)) {
+            // System doesn't have CA bundle - use bundled cacert.pem
+            $bundledCa = dirname(__DIR__) . '/cacert.pem';
+            if (file_exists($bundledCa)) {
+                curl_setopt($ch, CURLOPT_CAINFO, $bundledCa);
+            }
+        }
+        // else: System CA bundle is configured, cURL will use it automatically
     }
 }
