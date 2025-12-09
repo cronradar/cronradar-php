@@ -22,6 +22,26 @@ CronRadar::monitor('daily-backup');
 CronRadar::monitor('daily-backup', '0 2 * * *');
 ```
 
+## Lifecycle Tracking
+
+**Option 1: Wrapper (Automatic)**
+```php
+$backupJob = CronRadar::wrap('daily-backup', fn() => runBackup(), '0 2 * * *');
+$backupJob();
+```
+
+**Option 2: Manual**
+```php
+CronRadar::startJob('daily-backup');
+try {
+    runBackup();
+    CronRadar::completeJob('daily-backup');
+} catch (Exception $e) {
+    CronRadar::failJob('daily-backup', $e->getMessage());
+    throw $e;
+}
+```
+
 ## Configuration
 
 Set environment variable:
