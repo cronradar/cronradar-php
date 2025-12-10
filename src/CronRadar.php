@@ -207,14 +207,12 @@ class CronRadar
     private static function sendPingInternal(string $monitorKey, string $apiKey): ?array
     {
         try {
-            $url = 'https://cron.life/ping/' . urlencode($monitorKey);
+            // URL-based auth: /ping/{monitorKey}/{apiKey}
+            $url = 'https://cron.life/ping/' . urlencode($monitorKey) . '/' . urlencode($apiKey);
 
             $ch = curl_init($url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'GET');
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                'Authorization: Basic ' . base64_encode($apiKey . ':')
-            ]);
             curl_setopt($ch, CURLOPT_TIMEOUT, 5);
 
             $response = curl_exec($ch);
@@ -245,8 +243,8 @@ class CronRadar
         ?string $message = null
     ): void {
         try {
-            // Build URL
-            $url = 'https://cron.life/ping/' . urlencode($monitorKey) . '/' . $endpoint;
+            // URL-based auth: /ping/{monitorKey}/{apiKey}/{endpoint}
+            $url = 'https://cron.life/ping/' . urlencode($monitorKey) . '/' . urlencode($apiKey) . '/' . $endpoint;
 
             // Add query parameters
             $params = [];
@@ -264,9 +262,6 @@ class CronRadar
             $ch = curl_init($url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                'Authorization: Basic ' . base64_encode($apiKey . ':')
-            ]);
             curl_setopt($ch, CURLOPT_TIMEOUT, 5);
 
             curl_exec($ch);
