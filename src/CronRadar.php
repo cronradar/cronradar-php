@@ -19,7 +19,11 @@ class CronRadar
     public static function monitor(string $monitorKey, ?string $schedule = null): void
     {
         try {
-            $apiKey = getenv('CRONRADAR_API_KEY') ?: '';
+            if (!Constants::isValidMonitorKey($monitorKey)) {
+                return;
+            }
+
+            $apiKey = getenv(Constants::API_KEY_ENV_VAR) ?: '';
             if (empty($apiKey)) {
                 error_log("[CronRadar] Warning: CRONRADAR_API_KEY environment variable not set. Monitor '{$monitorKey}' will not be tracked.");
                 return;
@@ -56,7 +60,11 @@ class CronRadar
     public static function startJob(string $monitorKey, ?string $schedule = null): void
     {
         try {
-            $apiKey = getenv('CRONRADAR_API_KEY') ?: '';
+            if (!Constants::isValidMonitorKey($monitorKey)) {
+                return;
+            }
+
+            $apiKey = getenv(Constants::API_KEY_ENV_VAR) ?: '';
             if (empty($apiKey)) return;
 
             self::sendLifecyclePing($monitorKey, 'start', $apiKey, $schedule);
@@ -75,7 +83,11 @@ class CronRadar
     public static function completeJob(string $monitorKey): void
     {
         try {
-            $apiKey = getenv('CRONRADAR_API_KEY') ?: '';
+            if (!Constants::isValidMonitorKey($monitorKey)) {
+                return;
+            }
+
+            $apiKey = getenv(Constants::API_KEY_ENV_VAR) ?: '';
             if (empty($apiKey)) return;
 
             self::sendLifecyclePing($monitorKey, 'complete', $apiKey);
@@ -95,7 +107,11 @@ class CronRadar
     public static function failJob(string $monitorKey, ?string $message = null): void
     {
         try {
-            $apiKey = getenv('CRONRADAR_API_KEY') ?: '';
+            if (!Constants::isValidMonitorKey($monitorKey)) {
+                return;
+            }
+
+            $apiKey = getenv(Constants::API_KEY_ENV_VAR) ?: '';
             if (empty($apiKey)) return;
 
             self::sendLifecyclePing($monitorKey, 'fail', $apiKey, null, $message);
@@ -149,7 +165,11 @@ class CronRadar
         ?string $name = null
     ): void {
         try {
-            $apiKey = getenv('CRONRADAR_API_KEY') ?: '';
+            if (!Constants::isValidMonitorKey($monitorKey)) {
+                return;
+            }
+
+            $apiKey = getenv(Constants::API_KEY_ENV_VAR) ?: '';
             if (empty($apiKey)) {
                 error_log("[CronRadar] Warning: CRONRADAR_API_KEY environment variable not set. Monitor '{$monitorKey}' will not be synced.");
                 return;
@@ -165,12 +185,12 @@ class CronRadar
                         'key' => $monitorKey,
                         'name' => $name,
                         'schedule' => $schedule,
-                        'gracePeriod' => 60
+                        'gracePeriod' => Constants::DEFAULT_GRACE_PERIOD_SECONDS
                     ]
                 ]
             ];
 
-            $url = 'https://cron.life/api/sync';
+            $url = Constants::BASE_URL . '/api/sync';
 
             $ch = curl_init($url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -180,7 +200,7 @@ class CronRadar
                 'Content-Type: application/json',
                 'Authorization: Basic ' . base64_encode($apiKey . ':')
             ]);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+            curl_setopt($ch, CURLOPT_TIMEOUT, Constants::DEFAULT_TIMEOUT_SECONDS);
 
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -208,12 +228,12 @@ class CronRadar
     {
         try {
             // URL-based auth: /ping/{monitorKey}/{apiKey}
-            $url = 'https://cron.life/ping/' . urlencode($monitorKey) . '/' . urlencode($apiKey);
+            $url = Constants::BASE_URL . '/ping/' . urlencode($monitorKey) . '/' . urlencode($apiKey);
 
             $ch = curl_init($url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'GET');
-            curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+            curl_setopt($ch, CURLOPT_TIMEOUT, Constants::DEFAULT_TIMEOUT_SECONDS);
 
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -244,7 +264,7 @@ class CronRadar
     ): void {
         try {
             // URL-based auth: /ping/{monitorKey}/{apiKey}/{endpoint}
-            $url = 'https://cron.life/ping/' . urlencode($monitorKey) . '/' . urlencode($apiKey) . '/' . $endpoint;
+            $url = Constants::BASE_URL . '/ping/' . urlencode($monitorKey) . '/' . urlencode($apiKey) . '/' . $endpoint;
 
             // Add query parameters
             $params = [];
@@ -262,7 +282,7 @@ class CronRadar
             $ch = curl_init($url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-            curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+            curl_setopt($ch, CURLOPT_TIMEOUT, Constants::DEFAULT_TIMEOUT_SECONDS);
 
             curl_exec($ch);
             curl_close($ch);

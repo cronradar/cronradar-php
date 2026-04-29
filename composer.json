@@ -1,6 +1,6 @@
 {
     "name": "cronradar/php",
-    "version": "0.0.6",
+    "version": "0.0.7",
     "description": "Dead-simple cron job monitoring with auto-registration. One primary function: monitor(). Advanced: sync(). Self-healing monitors.",
     "keywords": ["cron", "monitoring", "scheduler", "job", "task", "ping", "sync", "auto-register"],
     "license": "proprietary",
@@ -15,10 +15,21 @@
         "ext-curl": "*",
         "ext-json": "*"
     },
+    "require-dev": {
+        "phpunit/phpunit": "^10.0"
+    },
     "autoload": {
         "psr-4": {
             "CronRadar\\": "src/"
         }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "CronRadar\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit tests/"
     },
     "minimum-stability": "stable",
     "prefer-stable": true
