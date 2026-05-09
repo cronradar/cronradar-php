@@ -90,23 +90,23 @@ try {
 
 ## Reference
 
-### `CronRadar::monitor(string $key, ?string $schedule = null, ?int $gracePeriod = null): void`
+### `CronRadar::monitor(string $monitorKey, ?string $schedule = null): void`
 
 Records a successful execution.
 
 ```php
 CronRadar::monitor('daily-backup');
 CronRadar::monitor('daily-backup', '0 2 * * *');
-CronRadar::monitor('daily-backup', '0 2 * * *', 120);
 ```
 
 | Parameter | Type | Required | Notes |
 |---|---|---|---|
-| `$key` | `string` | yes | Monitor key. Lowercase, kebab/snake/dot-case. Max 64 chars. |
+| `$monitorKey` | `string` | yes | Monitor key. Lowercase, kebab/snake/dot-case. Max 200 chars. |
 | `$schedule` | `?string` | optional | Standard 5-field cron expression. Required on the *first* ping for self-healing registration. |
-| `$gracePeriod` | `?int` | optional | Seconds. How late the next ping can be before an alert fires. Default: 60. |
 
 Throws: never. Network errors and 4xx/5xx responses are caught and logged via `error_log`.
+
+Grace period is configured per-monitor on CronRadar (default 60 seconds; set via the dashboard or the `gracePeriod` argument to `syncMonitor`). It's not a per-call argument.
 
 ### `CronRadar::startJob(string $key): void`
 
@@ -143,7 +143,7 @@ CronRadar::failJob('daily-backup', 'Database connection refused');
 
 Triggers an immediate alert (no grace period). The message appears in the alert payload.
 
-### `CronRadar::wrap(string $key, callable $fn, ?string $schedule = null, ?int $gracePeriod = null): callable`
+### `CronRadar::wrap(string $monitorKey, callable $fn, ?string $schedule = null): callable`
 
 Wraps a callable with full lifecycle tracking. Returns a callable that, when invoked, calls `$fn` with start/complete/fail tracking.
 
@@ -154,10 +154,9 @@ $result = $wrapped();
 
 | Parameter | Type | Required | Notes |
 |---|---|---|---|
-| `$key` | `string` | yes | Monitor key. |
+| `$monitorKey` | `string` | yes | Monitor key. |
 | `$fn` | `callable` | yes | The callable to instrument. |
 | `$schedule` | `?string` | optional | Cron expression for self-healing registration. |
-| `$gracePeriod` | `?int` | optional | Seconds. Default: 60. |
 
 The wrapped callable returns whatever `$fn` returns. If `$fn` throws, the wrapper re-throws after recording the failure. Monitoring never swallows your exceptions.
 
@@ -183,9 +182,9 @@ Used internally by extensions; rarely needed in application code.
 | Environment variable | Required | Default | Purpose |
 |---|---|---|---|
 | `CRONRADAR_API_KEY` | yes | — | API key from the CronRadar dashboard. Format `ck_app_xxxxx`. |
-| `CRONRADAR_BASE_URL` | no | `https://cron.life` | Override the ingestion endpoint. Used for self-hosted or staging environments. |
-| `CRONRADAR_TIMEOUT` | no | `5` | HTTP request timeout in seconds. |
-| `CRONRADAR_LOG_ERRORS` | no | `1` | Set to `0` to suppress the `error_log` warnings the SDK emits on network failure. |
+| `CRONRADAR_DEBUG` | no | `false` | Set to `true` to log every request and error via `error_log`. |
+
+The base URL (`https://cron.life`), HTTP timeout (5 seconds), and default grace period (60 seconds) are constants in `src/Constants.php`. To customize them, fork the SDK or open an issue for a configurable hook.
 
 ## Error handling
 
@@ -204,7 +203,7 @@ What this looks like at runtime:
 | Wrapped callable throws | Records `failJob`; re-throws | Receives the original exception |
 | `CRONRADAR_API_KEY` missing | Logs once per process; subsequent calls no-op | Continues normally |
 
-If you need to know whether a ping succeeded — for example, in tests — every static method returns `void` either way; success is silent. Inspect `error_log` (or php's stderr) or set `CRONRADAR_LOG_ERRORS=1` (default) to see failures.
+If you need to know whether a ping succeeded — for example, in tests — every static method returns `void` either way; success is silent. Set `CRONRADAR_DEBUG=true` to log every request and error via `error_log`.
 
 ## Troubleshooting
 
@@ -245,15 +244,15 @@ Three things to check, in order:
 2. **Network** — outbound HTTPS to `https://cron.life` may be blocked by firewall.
 3. **Process termination** — short-lived CLI scripts using fire-and-forget transports may exit before the HTTP request completes. The default transport is synchronous so this is uncommon.
 
-### Errors are noisy in development
+### I want to see what the SDK is doing in development
 
-Set `CRONRADAR_LOG_ERRORS=0` in dev environments where you don't have a real API key set:
+By default the SDK is silent. To trace every request and error:
 
 ```bash
-CRONRADAR_LOG_ERRORS=0 php my_job.php
+CRONRADAR_DEBUG=true php my_job.php
 ```
 
-The SDK still no-ops cleanly; it just stops complaining.
+If `CRONRADAR_API_KEY` is unset entirely, the SDK no-ops every call without logging.
 
 ## Links
 
